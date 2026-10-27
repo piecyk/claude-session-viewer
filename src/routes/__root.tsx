@@ -20,11 +20,15 @@ const css = `
   body { margin: 0; background: Canvas; }
   a { color: inherit; }
   .layout { display: grid; grid-template-columns: 300px minmax(0, 1fr); }
+  /* The sidebar is a popover (a drawer on narrow screens). These rules undo the
+     browser's popover styles so it sits in the grid on wide screens. */
   .sidebar {
-    position: sticky; top: 0; height: 100vh; overflow-y: auto; box-sizing: border-box;
-    padding: 12px 8px; background: var(--sidebar); border-right: 1px solid var(--border);
+    display: block; position: sticky; inset: auto; top: 0; width: auto; height: 100vh;
+    margin: 0; border: 0; border-right: 1px solid var(--border); box-sizing: border-box;
+    overflow-y: auto; padding: 12px 8px; color: inherit; background: var(--sidebar);
     font-size: 14px;
   }
+  .topbar { display: none; }
   .sidebar details { margin-bottom: 12px; }
   .sidebar summary {
     display: flex; align-items: center; gap: 6px; padding: 6px 8px;
@@ -61,8 +65,15 @@ const css = `
   form button { justify-self: start; padding: 6px 16px; }
   @media (max-width: 700px) {
     .layout { grid-template-columns: minmax(0, 1fr); }
-    .sidebar { position: static; height: auto; max-height: 40vh; border-right: 0; border-bottom: 1px solid var(--border); }
-    main { padding: 16px 16px 0; }
+    .sidebar { position: fixed; inset: 0 auto 0 0; width: min(85vw, 320px); height: 100dvh; }
+    .sidebar:not(:popover-open) { display: none; }
+    .sidebar::backdrop { background: rgb(0 0 0 / .4); }
+    .topbar {
+      display: flex; position: sticky; top: 0; z-index: 1; padding: 8px 0;
+      background: Canvas; border-bottom: 1px solid var(--border);
+    }
+    .topbar button { font: inherit; padding: 6px 12px; }
+    main { padding: 0 16px; }
   }
 `
 
@@ -89,10 +100,17 @@ export const Route = createRootRoute({
       </body>
     </html>
   ),
+  // Mobile Safari asks for /favicon.ico and /apple-touch-icon.png; no route matches them.
+  notFoundComponent: () => <p className="empty">Not found.</p>,
   component: () => (
     <div className="layout">
       <Sidebar />
       <main>
+        <div className="topbar">
+          <button type="button" popoverTarget="sidebar">
+            ☰ Sessions
+          </button>
+        </div>
         <div className="content">
           <Outlet />
         </div>
@@ -109,7 +127,23 @@ function Sidebar() {
   const navigate = useNavigate()
 
   return (
-    <nav className="sidebar" aria-label="Projects and sessions">
+    <nav
+      id="sidebar"
+      popover="auto"
+      className="sidebar"
+      aria-label="Projects and sessions"
+      // Close the mobile drawer after picking a session or pressing +.
+      onClick={(event) => {
+        const nav = event.currentTarget
+        if (
+          event.target instanceof Element &&
+          event.target.closest('a, summary button') &&
+          nav.matches(':popover-open')
+        ) {
+          nav.hidePopover()
+        }
+      }}
+    >
       {projects.map((p) => {
         const links = p.sessions.map((s) => (
           <Link

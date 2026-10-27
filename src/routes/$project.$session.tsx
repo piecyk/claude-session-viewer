@@ -10,9 +10,6 @@ export const Route = createFileRoute('/$project/$session')({
   component: Transcript,
 })
 
-// ponytail: fixed guess of the sticky form height; measure it if the form changes.
-const FORM_HEIGHT = 190
-
 // A new key per session resets live entries, pending state, and the virtualizer.
 function Transcript() {
   const { project, session } = Route.useParams()
@@ -39,14 +36,17 @@ function TranscriptView({ project, session }: { project: string; session: string
     estimateSize: () => 80,
     overscan: 5,
     scrollMargin: listTop,
-    scrollPaddingEnd: FORM_HEIGHT,
     getItemKey: (i) => all[i].uuid || i,
+    // Chat behavior: stay at the end while entries resize, and follow new
+    // entries only when the reader is already at the end.
+    anchorTo: 'end',
+    followOnAppend: true,
   })
 
-  // ponytail: always follows new entries, even if you scrolled up to read.
+  // Open at the last entry; anchorTo and followOnAppend keep it there.
   useEffect(() => {
-    if (all.length > 0) virtualizer.scrollToIndex(all.length - 1, { align: 'end' })
-  }, [all.length, virtualizer])
+    virtualizer.scrollToEnd()
+  }, [virtualizer])
 
   async function send(text: string) {
     setPending(true)

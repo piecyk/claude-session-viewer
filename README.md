@@ -6,8 +6,10 @@ A local web app to read and continue your Claude Code sessions. Built with
 
 - Two panes, like Claude Desktop: projects and sessions from
   `~/.claude/projects` on the left, the transcript on the right.
+  On narrow screens, the sidebar is a drawer behind a **Sessions** button.
 - Shows text, thinking, tool calls, and tool results.
 - Sends a message to a session and streams each step while Claude works.
+  The transcript follows new entries while you are at the end.
 - Starts a new session in a project and adds it to Claude Desktop.
 
 ## Requirements
@@ -59,7 +61,6 @@ This app runs Claude on your machine with your session permissions, for example
 - The transcript uses the line order of the file. Branches from edited messages
   show one after the other.
 - Output streams one step at a time, not one token at a time.
-- The page always scrolls to new entries, even if you scrolled up.
 - Do not send to a session that is running in another window at the same time.
 
 ## Scripts
