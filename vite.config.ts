@@ -5,13 +5,13 @@ import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
 
 // Basic auth for remote access, for example through a tunnel. Off unless
-// VIEWER_PASSWORD is set. Any user name works; only the password is checked.
-function basicAuth(password: string | undefined): Plugin {
-  const expected = Buffer.from(password ?? '')
+// VIEWER_PASSWORD is set. VIEWER_USER is optional; without it, any user name works.
+function basicAuth(user: string | undefined, password: string | undefined): Plugin {
+  const expected = Buffer.from(user ? `${user}:${password}` : (password ?? ''))
   const check: Connect.NextHandleFunction = (req, res, next) => {
     const [scheme, encoded] = (req.headers.authorization ?? '').split(' ')
     const decoded = scheme === 'Basic' ? Buffer.from(encoded ?? '', 'base64').toString() : ''
-    const given = Buffer.from(decoded.slice(decoded.indexOf(':') + 1))
+    const given = Buffer.from(user ? decoded : decoded.slice(decoded.indexOf(':') + 1))
     if (decoded.includes(':') && given.length === expected.length && timingSafeEqual(given, expected)) {
       return next()
     }
@@ -28,5 +28,9 @@ function basicAuth(password: string | undefined): Plugin {
 }
 
 export default defineConfig({
-  plugins: [basicAuth(process.env.VIEWER_PASSWORD), tanstackStart(), viteReact()],
+  plugins: [
+    basicAuth(process.env.VIEWER_USER, process.env.VIEWER_PASSWORD),
+    tanstackStart(),
+    viteReact(),
+  ],
 })

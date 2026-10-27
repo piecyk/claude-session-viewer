@@ -30,8 +30,9 @@ Open http://127.0.0.1:3333.
 
 ### Remote access with a password
 
-Set `VIEWER_PASSWORD` to turn on HTTP Basic auth for every request. Any user
-name works. Without the variable, there is no password.
+Set `VIEWER_PASSWORD` to turn on HTTP Basic auth for every request. Without
+the variable, there is no password. Set `VIEWER_USER` too to require a user
+name; without it, any user name works.
 
 ```bash
 export VIEWER_PASSWORD="$(openssl rand -base64 24)"
