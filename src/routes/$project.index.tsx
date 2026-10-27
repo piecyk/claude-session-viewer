@@ -21,6 +21,7 @@ function Sessions() {
           navigate({
             to: '/$project/$session',
             params: { project, session: crypto.randomUUID() },
+            resetScroll: false,
           })
         }
       >
@@ -31,7 +32,8 @@ function Sessions() {
           {sessions.map((s) => (
             <tr key={s.id}>
               <td>
-                <Link to="/$project/$session" params={{ project, session: s.id }}>
+                {/* The transcript scrolls itself to the last entry; the router's reset would undo it. */}
+                <Link to="/$project/$session" params={{ project, session: s.id }} resetScroll={false}>
                   {s.title || s.id}
                 </Link>
               </td>
