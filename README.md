@@ -28,6 +28,27 @@ pnpm dev
 
 Open http://127.0.0.1:3333.
 
+### Remote access with a password
+
+Set `VIEWER_PASSWORD` to turn on HTTP Basic auth for every request. Any user
+name works. Without the variable, there is no password.
+
+```bash
+export VIEWER_PASSWORD="$(openssl rand -base64 24)"
+echo "$VIEWER_PASSWORD"
+pnpm dev
+```
+
+Then expose the server with a tunnel that keeps the connection on HTTPS, for
+example a [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/):
+
+```bash
+cloudflared tunnel --url http://127.0.0.1:3333 --http-host-header 127.0.0.1:3333
+```
+
+`--http-host-header` is required: the server accepts only `127.0.0.1` and
+`localhost` as the host.
+
 ## How it works
 
 - **Read.** Each session is a `.jsonl` file in `~/.claude/projects/<project>/`.
@@ -50,9 +71,12 @@ Open http://127.0.0.1:3333.
 This app runs Claude on your machine with your session permissions, for example
 `auto` mode. Transcripts can contain secrets from tool output.
 
-- Run it on `127.0.0.1` only. Do not deploy it or expose the port.
+- Run it on `127.0.0.1` only. Do not use `--host`: that opens the server to
+  your whole network, and reading needs no password unless `VIEWER_PASSWORD` is set.
 - The server accepts send requests only from its own pages on `127.0.0.1` or
   `localhost`. This blocks other websites and DNS rebinding.
+- Behind a tunnel, the host check passes. Always set `VIEWER_PASSWORD` before you
+  start a tunnel, and use a long random password.
 
 ## Limits
 
