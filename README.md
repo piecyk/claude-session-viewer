@@ -4,8 +4,9 @@ A local web app to read and continue your Claude Code sessions. Built with
 [TanStack Start](https://tanstack.com/start) and
 [TanStack Virtual](https://tanstack.com/virtual).
 
-- Lists your projects and sessions from `~/.claude/projects`.
-- Shows a session transcript: text, thinking, tool calls, and tool results.
+- Two panes, like Claude Desktop: projects and sessions from
+  `~/.claude/projects` on the left, the transcript on the right.
+- Shows text, thinking, tool calls, and tool results.
 - Sends a message to a session and streams each step while Claude works.
 - Starts a new session in a project and adds it to Claude Desktop.
 
@@ -35,7 +36,9 @@ Open http://127.0.0.1:3333.
   added folders from the session file, and passes them to `claude`. It never
   uses `bypassPermissions`. It skips `default`, because a headless run cannot
   ask you for approval.
-- **New session.** "New session" opens an empty page with a new UUID. The first
+- **Titles.** The sidebar shows the title Claude Desktop gave the session (a
+  `custom-title` record near the end of the file), or else the first prompt.
+- **New session.** The **+** next to a project opens an empty page with a new UUID. The first
   message runs `claude --session-id <uuid>`, with the folder and permissions of
   the newest session in that project. When the first turn ends, the server runs
   `claude --desktop --resume <uuid>`, so the session shows in Claude Desktop.

@@ -1,4 +1,4 @@
-import { Link, createFileRoute, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { formatTime } from '../parse.ts'
@@ -13,9 +13,17 @@ export const Route = createFileRoute('/$project/$session')({
 // ponytail: fixed guess of the sticky form height; measure it if the form changes.
 const FORM_HEIGHT = 190
 
+// A new key per session resets live entries, pending state, and the virtualizer.
 function Transcript() {
-  const entries = Route.useLoaderData()
   const { project, session } = Route.useParams()
+  return <TranscriptView key={session} project={project} session={session} />
+}
+
+function TranscriptView({ project, session }: { project: string; session: string }) {
+  const entries = Route.useLoaderData()
+  const sidebar = useLoaderData({ from: '__root__' })
+  const group = sidebar.find((p) => p.name === project)
+  const title = group?.sessions.find((s) => s.id === session)?.title
   const router = useRouter()
   const [live, setLive] = useState<Array<Entry>>([])
   const [pending, setPending] = useState(false)
@@ -66,12 +74,8 @@ function Transcript() {
 
   return (
     <>
-      <p>
-        <Link to="/$project" params={{ project }}>
-          {project}
-        </Link>
-      </p>
-      <h1>{session}</h1>
+      <p className="meta">{group?.label ?? project}</p>
+      <h1>{title || (entries.length === 0 ? 'New session' : session)}</h1>
       <div ref={listRef} style={{ position: 'relative', height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((item) => {
           const e = all[item.index]

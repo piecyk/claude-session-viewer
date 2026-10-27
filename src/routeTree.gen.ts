@@ -10,17 +10,11 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as ProjectIndexRouteImport } from './routes/$project.index'
 import { Route as ProjectSessionRouteImport } from './routes/$project.$session'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ProjectIndexRoute = ProjectIndexRouteImport.update({
-  id: '/$project/',
-  path: '/$project/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ProjectSessionRoute = ProjectSessionRouteImport.update({
@@ -32,31 +26,27 @@ const ProjectSessionRoute = ProjectSessionRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$project/$session': typeof ProjectSessionRoute
-  '/$project/': typeof ProjectIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$project/$session': typeof ProjectSessionRoute
-  '/$project': typeof ProjectIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$project/$session': typeof ProjectSessionRoute
-  '/$project/': typeof ProjectIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$project/$session' | '/$project/'
+  fullPaths: '/' | '/$project/$session'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$project/$session' | '/$project'
-  id: '__root__' | '/' | '/$project/$session' | '/$project/'
+  to: '/' | '/$project/$session'
+  id: '__root__' | '/' | '/$project/$session'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ProjectSessionRoute: typeof ProjectSessionRoute
-  ProjectIndexRoute: typeof ProjectIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -66,13 +56,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/$project/': {
-      id: '/$project/'
-      path: '/$project'
-      fullPath: '/$project/'
-      preLoaderRoute: typeof ProjectIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$project/$session': {
@@ -88,7 +71,6 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ProjectSessionRoute: ProjectSessionRoute,
-  ProjectIndexRoute: ProjectIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

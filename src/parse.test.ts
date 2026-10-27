@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { firstPrompt, parseSession, sessionSettings } from './parse.ts'
+import { customTitle, firstPrompt, parseSession, sessionSettings } from './parse.ts'
 
 const jsonl = [
   JSON.stringify({ type: 'queue-operation' }),
@@ -49,6 +49,16 @@ test('parseSession keeps user/assistant records and normalizes blocks', () => {
 
 test('firstPrompt skips meta records', () => {
   assert.equal(firstPrompt(jsonl), 'hello')
+})
+
+test('customTitle returns the last custom-title, else empty', () => {
+  const titled = [
+    jsonl,
+    JSON.stringify({ type: 'custom-title', customTitle: 'Old' }),
+    JSON.stringify({ type: 'custom-title', customTitle: 'New' }),
+  ].join('\n')
+  assert.equal(customTitle(titled), 'New')
+  assert.equal(customTitle(jsonl), '')
 })
 
 test('sessionSettings keeps first cwd, last headless mode, and last added folders', () => {

@@ -125,6 +125,20 @@ export function sessionSettings(jsonl: string): SessionSettings {
   return settings
 }
 
+// The desktop app writes its session titles as `custom-title` records, again
+// during the session, so the newest one is near the end of the file.
+export function customTitle(jsonl: string): string {
+  let title = ''
+  for (const line of jsonl.split('\n')) {
+    if (!line.includes('"custom-title"')) continue
+    try {
+      const r: { type?: unknown; customTitle?: unknown } = JSON.parse(line)
+      if (r.type === 'custom-title' && typeof r.customTitle === 'string') title = r.customTitle
+    } catch {}
+  }
+  return title
+}
+
 export function firstPrompt(jsonl: string): string {
   for (const e of parseSession(jsonl)) {
     if (e.role !== 'user') continue

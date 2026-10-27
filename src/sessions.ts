@@ -3,9 +3,9 @@ import { getRequestHeader } from '@tanstack/react-start/server'
 import { spawn } from 'node:child_process'
 import { open, readFile, readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { firstPrompt, parseSession, sessionSettings } from './parse.ts'
+import { customTitle, firstPrompt, parseSession, sessionSettings } from './parse.ts'
 
 const ROOT = join(homedir(), '.claude', 'projects')
 
@@ -28,40 +28,53 @@ async function jsonlFiles(dir: string) {
   return files.sort((a, b) => b.mtime - a.mtime)
 }
 
-export const listProjects = createServerFn({ method: 'GET' }).handler(
-  async () => {
-    const dirs = await readdir(ROOT, { withFileTypes: true })
-    const projects = await Promise.all(
-      dirs
-        .filter((d) => d.isDirectory())
-        .map(async (d) => {
-          const files = await jsonlFiles(join(ROOT, d.name))
-          return { name: d.name, sessions: files.length, mtime: files[0]?.mtime ?? 0 }
-        }),
-    )
-    return projects
-      .filter((p) => p.sessions > 0)
-      .sort((a, b) => b.mtime - a.mtime)
-  },
-)
+const CHUNK = 65536
 
-export const listSessions = createServerFn({ method: 'GET' })
-  .validator((project: unknown) => segment(project))
-  .handler(async ({ data: project }) => {
-    const dir = join(ROOT, project)
-    const files = await jsonlFiles(dir)
-    return Promise.all(
-      files.map(async (f) => {
-        // ponytail: title from the first 64 KB only; read more if prompts go missing.
-        const fh = await open(join(dir, `${f.id}.jsonl`))
-        const { buffer, bytesRead } = await fh.read(Buffer.alloc(65536), 0, 65536, 0)
-        await fh.close()
-        const head = buffer.toString('utf8', 0, bytesRead)
-        const complete = head.slice(0, head.lastIndexOf('\n') + 1)
-        return { ...f, title: firstPrompt(complete) }
+// Complete lines from the first or the last 64 KB of a file.
+// ponytail: cwd and first prompt from the head, title from the tail; read more if they go missing.
+async function readLines(path: string, from: 'head' | 'tail', size: number) {
+  const start = from === 'head' ? 0 : Math.max(0, size - CHUNK)
+  const fh = await open(path)
+  try {
+    const { buffer, bytesRead } = await fh.read(Buffer.alloc(CHUNK), 0, CHUNK, start)
+    let text = buffer.toString('utf8', 0, bytesRead)
+    if (start > 0) text = text.slice(text.indexOf('\n') + 1)
+    return text.slice(0, text.lastIndexOf('\n') + 1)
+  } finally {
+    await fh.close()
+  }
+}
+
+export const listSidebar = createServerFn({ method: 'GET' }).handler(async () => {
+  const dirs = await readdir(ROOT, { withFileTypes: true })
+  const projects = await Promise.all(
+    dirs
+      .filter((d) => d.isDirectory())
+      .map(async (d) => {
+        const dir = join(ROOT, d.name)
+        const files = await jsonlFiles(dir)
+        const sessions = await Promise.all(
+          files.map(async (f) => {
+            const path = join(dir, `${f.id}.jsonl`)
+            const head = await readLines(path, 'head', f.size)
+            const tail = await readLines(path, 'tail', f.size)
+            return {
+              id: f.id,
+              title: customTitle(tail) || firstPrompt(head),
+              cwd: sessionSettings(head).cwd,
+            }
+          }),
+        )
+        return {
+          name: d.name,
+          label: basename(sessions.find((s) => s.cwd)?.cwd ?? d.name),
+          mtime: files[0]?.mtime ?? 0,
+          sessions: sessions.map(({ id, title }) => ({ id, title })),
+        }
       }),
-    )
-  })
+  )
+  return projects.filter((p) => p.sessions.length > 0).sort((a, b) => b.mtime - a.mtime)
+})
 
 export const getSession = createServerFn({ method: 'GET' })
   .validator((input: { project: string; session: string }) => ({
