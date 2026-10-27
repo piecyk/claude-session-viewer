@@ -5,7 +5,7 @@ import { open, readFile, readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { customTitle, firstPrompt, lastActivity, parseSession, sessionSettings } from './parse.ts'
+import { customTitle, firstPrompt, lastActivity, parseSession, sessionSettings, turnRunning } from './parse.ts'
 import type { Entry, PermissionRequest } from './parse.ts'
 
 const ROOT = join(homedir(), '.claude', 'projects')
@@ -78,6 +78,31 @@ export const listSidebar = createServerFn({ method: 'GET' }).handler(async () =>
       }),
   )
   return projects.filter((p) => p.sessions.length > 0).sort((a, b) => b.mtime - a.mtime)
+})
+
+// Sessions with a turn this server started that has not exited yet.
+const runningHere = new Set<string>()
+// A turn that ended without a final record (a crash) stops counting after this.
+const RECENT_MS = 10 * 60_000
+
+// Sessions with a turn in progress: the ones this server runs, plus any recently
+// written file whose last turn has not ended (Claude Desktop, a terminal).
+export const runningSessions = createServerFn({ method: 'GET' }).handler(async () => {
+  const ids = new Set(runningHere)
+  const since = Date.now() - RECENT_MS
+  const dirs = await readdir(ROOT, { withFileTypes: true })
+  await Promise.all(
+    dirs
+      .filter((d) => d.isDirectory())
+      .map(async (d) => {
+        const dir = join(ROOT, d.name)
+        for (const f of await jsonlFiles(dir)) {
+          if (f.mtime < since) break // newest first
+          if (turnRunning(await readLines(join(dir, `${f.id}.jsonl`), 'tail', f.size))) ids.add(f.id)
+        }
+      }),
+  )
+  return [...ids]
 })
 
 export const getSession = createServerFn({ method: 'GET' })
@@ -188,6 +213,7 @@ export const sendMessage = createServerFn({ method: 'POST' })
     // A write after claude has exited fails with EPIPE; without a listener that
     // error would crash the whole server. The exit code below reports the failure.
     child.stdin.on('error', () => {})
+    runningHere.add(data.session)
     const send = (message: unknown) => {
       if (!child.stdin.writableEnded) child.stdin.write(`${JSON.stringify(message)}\n`)
     }
@@ -198,6 +224,7 @@ export const sendMessage = createServerFn({ method: 'POST' })
       child.on('error', resolve)
       child.on('close', resolve)
     })
+    void exit.then(() => runningHere.delete(data.session))
     // The desktop app does not pick up CLI sessions on its own. This waits for
     // the process, not the response, so it also runs when the page goes away
     // mid-turn (a locked phone, a dropped tunnel).

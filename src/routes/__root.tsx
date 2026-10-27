@@ -5,8 +5,10 @@ import {
   Scripts,
   createRootRoute,
   useNavigate,
+  useRouter,
 } from '@tanstack/react-router'
-import { listSidebar } from '../sessions.ts'
+import { useEffect, useState } from 'react'
+import { listSidebar, runningSessions } from '../sessions.ts'
 
 const css = `
   :root {
@@ -49,6 +51,12 @@ const css = `
   }
   .session:hover { background: var(--hover); }
   .session.active { background: var(--active); }
+  .running {
+    display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 50%;
+    background: #f59e0b; vertical-align: middle; animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse { 50% { opacity: .3; } }
+  @media (prefers-reduced-motion: reduce) { .running { animation: none; } }
   main { min-width: 0; padding: 16px 24px 0; }
   .content { max-width: 900px; margin: 0 auto; }
   .empty { margin-top: 30vh; text-align: center; opacity: .7; }
@@ -130,9 +138,42 @@ export const Route = createRootRoute({
 // ponytail: newest 10 per project, the rest folded; add search if the list gets long.
 const VISIBLE = 10
 
+// ponytail: polls every 4 s while the tab is visible; push events if this gets heavy.
+const POLL_MS = 4000
+
+function useRunningSessions() {
+  const router = useRouter()
+  const [running, setRunning] = useState<Set<string>>(new Set())
+  useEffect(() => {
+    let previous = new Set<string>()
+    let active = true
+    const poll = async () => {
+      if (document.hidden) return
+      try {
+        const ids = new Set(await runningSessions())
+        if (!active) return
+        // A turn ended: reload the sidebar (titles, order), not the open transcript.
+        if ([...previous].some((id) => !ids.has(id))) {
+          void router.invalidate({ filter: (match) => match.routeId === '__root__' })
+        }
+        previous = ids
+        setRunning(ids)
+      } catch {}
+    }
+    void poll()
+    const timer = setInterval(poll, POLL_MS)
+    return () => {
+      active = false
+      clearInterval(timer)
+    }
+  }, [router])
+  return running
+}
+
 function Sidebar() {
   const projects = Route.useLoaderData()
   const navigate = useNavigate()
+  const running = useRunningSessions()
 
   return (
     <nav
@@ -164,6 +205,7 @@ function Sidebar() {
             resetScroll={false}
             title={s.title || s.id}
           >
+            {running.has(s.id) && <span className="running" role="img" aria-label="Running" title="Running" />}
             {s.title || s.id}
           </Link>
         ))

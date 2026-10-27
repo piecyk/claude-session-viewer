@@ -232,6 +232,30 @@ function promptTitle(text: string): string {
   return `${name} ${args}`.trim()
 }
 
+// Whether the latest turn is still going: it ends with an assistant record that
+// has a final stop_reason ('end_turn', 'max_tokens', ...). A prompt, a tool call
+// or a tool result last means Claude is still working (or was cut off).
+export function turnRunning(jsonl: string): boolean {
+  let running = false
+  for (const line of jsonl.split('\n')) {
+    if (!line.includes('"type":"user"') && !line.includes('"type":"assistant"')) continue
+    try {
+      const r: { type?: unknown; isMeta?: unknown; message?: { stop_reason?: unknown; content?: unknown } } =
+        JSON.parse(line)
+      if (r.isMeta) continue
+      if (r.type === 'assistant') {
+        const stop = r.message?.stop_reason
+        running = !(typeof stop === 'string' && stop !== 'tool_use')
+      } else if (r.type === 'user') {
+        const content = r.message?.content
+        const text = typeof content === 'string' ? content : ''
+        running = !text.startsWith('[Request interrupted')
+      }
+    } catch {}
+  }
+  return running
+}
+
 // Time of the last message, which is what Claude Desktop sorts by. File mtime is
 // not: other tools rewrite old session files.
 export function lastActivity(jsonl: string): string {

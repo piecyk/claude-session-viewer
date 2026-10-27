@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { customTitle, firstPrompt, lastActivity, lastPromptIndex, openNextStep, parseSession, sessionSettings } from './parse.ts'
+import { customTitle, firstPrompt, lastActivity, lastPromptIndex, openNextStep, parseSession, sessionSettings, turnRunning } from './parse.ts'
 
 const jsonl = [
   JSON.stringify({ type: 'queue-operation' }),
@@ -187,4 +187,18 @@ test('empty thinking blocks are dropped, and an entry with only those is skipped
     entries.map((e) => [e.uuid, e.blocks]),
     [['a2', [{ type: 'text', text: 'Hi' }]]],
   )
+})
+
+test('turnRunning is true until an assistant record ends the turn', () => {
+  const prompt = JSON.stringify({ type: 'user', message: { content: 'go' } })
+  const toolUse = JSON.stringify({ type: 'assistant', message: { stop_reason: 'tool_use', content: [] } })
+  const toolResult = JSON.stringify({ type: 'user', message: { content: [{ type: 'tool_result' }] } })
+  const done = JSON.stringify({ type: 'assistant', message: { stop_reason: 'end_turn', content: [] } })
+  const summary = JSON.stringify({ type: 'system', subtype: 'stop_hook_summary' })
+  const interrupted = JSON.stringify({ type: 'user', message: { content: '[Request interrupted by user]' } })
+  assert.equal(turnRunning(prompt), true)
+  assert.equal(turnRunning([prompt, toolUse, toolResult].join('\n')), true)
+  assert.equal(turnRunning([prompt, toolUse, toolResult, done, summary].join('\n')), false)
+  assert.equal(turnRunning([prompt, toolUse, interrupted].join('\n')), false)
+  assert.equal(turnRunning(''), false)
 })

@@ -93,6 +93,10 @@ done.
   approval arrives as a `control_request`. The page shows it with **Allow** and
   **Deny**, and the server writes the answer back to `claude`. If the page goes
   away, open and later requests are denied, so the turn still ends.
+- **Running.** The sidebar marks sessions with a turn in progress with a dot. It
+  polls every 4 seconds: sessions this server is running, plus session files
+  changed in the last 10 minutes whose last turn has not ended (no final
+  `stop_reason`). That also catches turns running in Claude Desktop or a terminal.
 - **Titles.** The sidebar shows the title Claude Desktop gave the session (a
   `custom-title` record near the end of the file), or else the first prompt.
 - **New session.** The **+** next to a project opens an empty page with a new UUID. The first
