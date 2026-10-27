@@ -96,7 +96,10 @@ export function parseSession(jsonl: string): Array<Entry> {
     const blocks =
       typeof content === 'string'
         ? [{ type: 'text' as const, text: content }]
-        : (content ?? []).map(toBlock)
+        : (content ?? [])
+            .map(toBlock)
+            // Some thinking is stored with empty text (only a signature); there is nothing to show.
+            .filter((b) => b.type !== 'thinking' || b.text.trim() !== '')
     if (blocks.length === 0) continue
     entries.push({
       uuid: r.uuid ?? '',

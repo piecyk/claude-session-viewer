@@ -163,3 +163,28 @@ test('spawn_task becomes a task card; lastPromptIndex skips tool results', () =>
   assert.deepEqual(entries[1].blocks[0], { type: 'task', title: 'Review PR #1', tldr: 'Short', prompt: 'Do the review.' })
   assert.equal(lastPromptIndex(entries), 0)
 })
+
+test('empty thinking blocks are dropped, and an entry with only those is skipped', () => {
+  const lines = [
+    JSON.stringify({
+      type: 'assistant',
+      uuid: 'a1',
+      message: { content: [{ type: 'thinking', thinking: '', signature: 'x' }] },
+    }),
+    JSON.stringify({
+      type: 'assistant',
+      uuid: 'a2',
+      message: {
+        content: [
+          { type: 'thinking', thinking: '  ' },
+          { type: 'text', text: 'Hi' },
+        ],
+      },
+    }),
+  ].join('\n')
+  const entries = parseSession(lines)
+  assert.deepEqual(
+    entries.map((e) => [e.uuid, e.blocks]),
+    [['a2', [{ type: 'text', text: 'Hi' }]]],
+  )
+})
