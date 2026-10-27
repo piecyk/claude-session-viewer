@@ -1,8 +1,15 @@
 import { timingSafeEqual } from 'node:crypto'
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import type { Connect, Plugin } from 'vite'
 import { tanstackStart } from '@tanstack/react-start/plugin/vite'
 import viteReact from '@vitejs/plugin-react'
+
+// VIEWER_USER and VIEWER_PASSWORD can live in .env (git-ignored). Variables
+// already set in the shell win.
+const envFile = resolve(import.meta.dirname, '.env')
+if (existsSync(envFile)) process.loadEnvFile(envFile)
 
 // Basic auth for remote access, for example through a tunnel. Off unless
 // VIEWER_PASSWORD is set. VIEWER_USER is optional; without it, any user name works.

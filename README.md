@@ -34,9 +34,11 @@ Set `VIEWER_PASSWORD` to turn on HTTP Basic auth for every request. Without
 the variable, there is no password. Set `VIEWER_USER` too to require a user
 name; without it, any user name works.
 
+You can export them in the shell, or put them in a `.env` file next to
+`package.json` (it is git-ignored). Variables set in the shell win.
+
 ```bash
-export VIEWER_PASSWORD="$(openssl rand -base64 24)"
-echo "$VIEWER_PASSWORD"
+printf 'VIEWER_USER=me\nVIEWER_PASSWORD=%s\n' "$(openssl rand -base64 24)" > .env
 pnpm dev
 ```
 
