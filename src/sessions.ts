@@ -153,6 +153,14 @@ export const sendMessage = createServerFn({ method: 'POST' })
       child.on('error', resolve)
       child.on('close', resolve)
     })
+    // The desktop app does not pick up CLI sessions on its own. This waits for
+    // the process, not the response, so it also runs when the page goes away
+    // mid-turn (a locked phone, a dropped tunnel).
+    if (isNew) {
+      void exit
+        .then((code) => (code === 0 ? addToDesktop(cwd, data.session) : undefined))
+        .catch((e) => console.error(`Adding session ${data.session} to Claude Desktop failed:`, e))
+    }
     try {
       for await (const line of createInterface({ input: child.stdout })) {
         yield* parseSession(line)
@@ -165,8 +173,6 @@ export const sendMessage = createServerFn({ method: 'POST' })
     if (code !== 0) {
       throw new Error(code instanceof Error ? code.message : stderr.trim() || `claude exited with ${code}`)
     }
-    // The desktop app does not pick up CLI sessions on its own.
-    if (isNew) await addToDesktop(cwd, data.session)
   })
 
 async function addToDesktop(cwd: string, session: string) {
