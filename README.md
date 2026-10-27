@@ -28,29 +28,57 @@ pnpm dev
 
 Open http://127.0.0.1:3333.
 
-### Remote access with a password
+### Remote access (phone) with a password
 
-Set `VIEWER_PASSWORD` to turn on HTTP Basic auth for every request. Without
-the variable, there is no password. Set `VIEWER_USER` too to require a user
-name; without it, any user name works.
+Use HTTP Basic auth and a
+[Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/).
+The tunnel gives you a public HTTPS URL; the password is what keeps others out.
 
-You can export them in the shell, or put them in a `.env` file next to
-`package.json` (it is git-ignored). Variables set in the shell win.
+1. Set the credentials in a `.env` file next to `package.json`. The file is
+   git-ignored.
 
-```bash
-printf 'VIEWER_USER=me\nVIEWER_PASSWORD=%s\n' "$(openssl rand -base64 24)" > .env
-pnpm dev
-```
+   ```bash
+   printf 'VIEWER_USER=me\nVIEWER_PASSWORD=%s\n' "$(openssl rand -base64 24)" > .env
+   chmod 600 .env
+   ```
 
-Then expose the server with a tunnel that keeps the connection on HTTPS, for
-example a [Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/):
+   - `VIEWER_PASSWORD` turns on Basic auth for every request. Without it, there
+     is no password.
+   - `VIEWER_USER` is optional. Without it, any user name works.
+   - Variables exported in the shell win over `.env`.
 
-```bash
-cloudflared tunnel --url http://127.0.0.1:3333 --http-host-header 127.0.0.1:3333
-```
+2. Start the server. It reads `.env` only at startup, so restart it after you
+   change the file.
 
-`--http-host-header` is required: the server accepts only `127.0.0.1` and
-`localhost` as the host.
+   ```bash
+   pnpm dev
+   ```
+
+3. Install `cloudflared` and start the tunnel in a second terminal.
+
+   ```bash
+   brew install cloudflared
+   cloudflared tunnel --url http://127.0.0.1:3333 --http-host-header 127.0.0.1:3333
+   ```
+
+   `--http-host-header` is required: the server accepts only `127.0.0.1` and
+   `localhost` as the host.
+
+4. Open the URL that `cloudflared` prints (`https://<random-words>.trycloudflare.com`)
+   and sign in. The URL changes every time you restart `cloudflared`; an old
+   URL shows Cloudflare error 1033. To read the current URL while the tunnel
+   runs:
+
+   ```bash
+   curl -s http://127.0.0.1:20241/quicktunnel
+   ```
+
+   `20241` is the default metrics port. If it is busy, `cloudflared` uses the
+   next free port.
+
+Do not use `cloudflared`'s `--allowed-mail` option: the page loads, but its
+later requests fail ("Load failed"). Stop the tunnel (`Ctrl+C`) when you are
+done.
 
 ## How it works
 
