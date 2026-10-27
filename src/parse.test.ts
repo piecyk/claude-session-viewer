@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { customTitle, firstPrompt, parseSession, sessionSettings } from './parse.ts'
+import { customTitle, firstPrompt, lastActivity, parseSession, sessionSettings } from './parse.ts'
 
 const jsonl = [
   JSON.stringify({ type: 'queue-operation' }),
@@ -78,4 +78,26 @@ test('sessionSettings keeps first cwd, last headless mode, and last added folder
     permissionMode: 'auto',
     addDirs: ['/a', '/b'],
   })
+})
+
+test('firstPrompt shows a slash command as its name and arguments', () => {
+  const command = JSON.stringify({
+    type: 'user',
+    message: {
+      content:
+        '<command-message>retro</command-message>\n<command-name>/retro</command-name>\n<command-args>last 10 sessions</command-args>',
+    },
+  })
+  assert.equal(firstPrompt(command), '/retro last 10 sessions')
+})
+
+test('lastActivity returns the last user or assistant timestamp', () => {
+  const lines = [
+    JSON.stringify({ type: 'user', timestamp: '2026-10-01T10:00:00Z' }),
+    JSON.stringify({ type: 'assistant', timestamp: '2026-10-01T10:05:00Z' }),
+    JSON.stringify({ type: 'system', timestamp: '2026-10-27T18:26:00Z' }),
+    '{broken',
+  ].join('\n')
+  assert.equal(lastActivity(lines), '2026-10-01T10:05:00Z')
+  assert.equal(lastActivity(''), '')
 })

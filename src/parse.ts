@@ -143,9 +143,33 @@ export function firstPrompt(jsonl: string): string {
   for (const e of parseSession(jsonl)) {
     if (e.role !== 'user') continue
     const text = e.blocks.find((b) => b.type === 'text')
-    if (text?.type === 'text') return text.text.slice(0, 120)
+    if (text?.type === 'text') return promptTitle(text.text).slice(0, 120)
   }
   return ''
+}
+
+// A slash command is stored as <command-name>/retro</command-name><command-args>…</command-args>.
+function promptTitle(text: string): string {
+  const name = /<command-name>([^<]*)<\/command-name>/.exec(text)?.[1]
+  if (!name) return text
+  const args = /<command-args>([^<]*)<\/command-args>/.exec(text)?.[1] ?? ''
+  return `${name} ${args}`.trim()
+}
+
+// Time of the last message, which is what Claude Desktop sorts by. File mtime is
+// not: other tools rewrite old session files.
+export function lastActivity(jsonl: string): string {
+  let last = ''
+  for (const line of jsonl.split('\n')) {
+    if (!line.includes('"timestamp"')) continue
+    try {
+      const r: { type?: unknown; timestamp?: unknown } = JSON.parse(line)
+      if ((r.type === 'user' || r.type === 'assistant') && typeof r.timestamp === 'string') {
+        last = r.timestamp
+      }
+    } catch {}
+  }
+  return last
 }
 
 // Fixed locale so server and browser render the same text (no hydration mismatch).

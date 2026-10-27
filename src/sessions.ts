@@ -5,7 +5,7 @@ import { open, readFile, readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
-import { customTitle, firstPrompt, parseSession, sessionSettings } from './parse.ts'
+import { customTitle, firstPrompt, lastActivity, parseSession, sessionSettings } from './parse.ts'
 
 const ROOT = join(homedir(), '.claude', 'projects')
 
@@ -62,13 +62,16 @@ export const listSidebar = createServerFn({ method: 'GET' }).handler(async () =>
               id: f.id,
               title: customTitle(tail) || firstPrompt(head),
               cwd: sessionSettings(head).cwd,
+              // Same order as Claude Desktop: the last message, not the file mtime.
+              activity: Date.parse(lastActivity(tail)) || f.mtime,
             }
           }),
         )
+        sessions.sort((a, b) => b.activity - a.activity)
         return {
           name: d.name,
           label: basename(sessions.find((s) => s.cwd)?.cwd ?? d.name),
-          mtime: files[0]?.mtime ?? 0,
+          mtime: sessions[0]?.activity ?? 0,
           sessions: sessions.map(({ id, title }) => ({ id, title })),
         }
       }),
