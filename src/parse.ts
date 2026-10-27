@@ -4,6 +4,15 @@ export type Block =
   | { type: 'tool_use'; name: string; input: string }
   | { type: 'tool_result'; text: string; isError: boolean }
 
+// A tool call waiting for Allow or Deny in the viewer.
+export type PermissionRequest = {
+  kind: 'permission'
+  requestId: string
+  tool: string
+  description: string
+  input: string
+}
+
 export type Entry = {
   uuid: string
   role: 'user' | 'assistant'
@@ -101,9 +110,16 @@ type SettingsRecord = {
   attachment?: { snapshot?: { additionalWorkingDirectories?: unknown } }
 }
 
-// ponytail: skips 'default' (a headless run cannot ask for approval) and
-// 'bypassPermissions' (a web form must not turn it on).
-const HEADLESS_MODES = ['acceptEdits', 'auto', 'plan', 'dontAsk', 'manual']
+// Modes the CLI accepts. The app records 'default', which the CLI calls 'manual'.
+// 'bypassPermissions' is skipped: a web form must not turn it on.
+const CLI_MODES: Record<string, string> = {
+  acceptEdits: 'acceptEdits',
+  auto: 'auto',
+  plan: 'plan',
+  dontAsk: 'dontAsk',
+  manual: 'manual',
+  default: 'manual',
+}
 
 // The access the app gave this session, so a resumed headless run gets the same.
 export function sessionSettings(jsonl: string): SessionSettings {
@@ -116,8 +132,8 @@ export function sessionSettings(jsonl: string): SessionSettings {
       continue
     }
     if (!settings.cwd && typeof r.cwd === 'string') settings.cwd = r.cwd
-    if (typeof r.permissionMode === 'string' && HEADLESS_MODES.includes(r.permissionMode)) {
-      settings.permissionMode = r.permissionMode
+    if (typeof r.permissionMode === 'string' && Object.hasOwn(CLI_MODES, r.permissionMode)) {
+      settings.permissionMode = CLI_MODES[r.permissionMode]
     }
     const dirs = r.attachment?.snapshot?.additionalWorkingDirectories
     if (Array.isArray(dirs)) settings.addDirs = dirs.filter((d) => typeof d === 'string')

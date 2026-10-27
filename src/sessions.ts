@@ -1,11 +1,12 @@
 import { createServerFn } from '@tanstack/react-start'
-import { getRequestHeader } from '@tanstack/react-start/server'
+import { getRequest, getRequestHeader } from '@tanstack/react-start/server'
 import { spawn } from 'node:child_process'
 import { open, readFile, readdir, stat } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { basename, join } from 'node:path'
 import { createInterface } from 'node:readline'
 import { customTitle, firstPrompt, lastActivity, parseSession, sessionSettings } from './parse.ts'
+import type { Entry, PermissionRequest } from './parse.ts'
 
 const ROOT = join(homedir(), '.claude', 'projects')
 
@@ -112,6 +113,35 @@ function assertLocalSameOrigin() {
   }
 }
 
+// Open approval requests across all running turns, by request id.
+const pending = new Map<string, (allow: boolean) => void>()
+
+type ControlLine = {
+  type?: string
+  request_id?: string
+  request?: {
+    subtype?: string
+    tool_name?: string
+    display_name?: string
+    description?: string
+    input?: unknown
+  }
+}
+
+export const answerPermission = createServerFn({ method: 'POST' })
+  .validator((input: { requestId: string; allow: boolean }) => {
+    if (typeof input.requestId !== 'string' || typeof input.allow !== 'boolean') {
+      throw new Error('Invalid answer')
+    }
+    return { requestId: input.requestId, allow: input.allow }
+  })
+  .handler(async ({ data }) => {
+    assertLocalSameOrigin()
+    const resolve = pending.get(data.requestId)
+    if (!resolve) throw new Error('This request is no longer open')
+    resolve(data.allow)
+  })
+
 export const sendMessage = createServerFn({ method: 'POST' })
   .validator((input: { project: string; session: string; text: string }) => {
     if (typeof input.text !== 'string' || !input.text.trim()) {
@@ -138,18 +168,30 @@ export const sendMessage = createServerFn({ method: 'POST' })
     if (!cwd) throw new Error('Session has no cwd')
     // stream-json lines have the same shape as session file records.
     // ponytail: one entry per step, not per token; add --include-partial-messages for token streaming.
+    // `--permission-prompt-tool stdio` sends approval requests to us as
+    // control_request lines instead of denying them.
     const args = [
       isNew ? '--session-id' : '--resume',
       data.session,
       '--print',
+      '--input-format',
+      'stream-json',
       '--output-format',
       'stream-json',
       '--verbose',
+      '--permission-prompt-tool',
+      'stdio',
     ]
     if (permissionMode) args.push('--permission-mode', permissionMode)
     if (addDirs.length > 0) args.push('--add-dir', ...addDirs)
     const child = spawn('claude', args, { cwd })
-    child.stdin.end(data.text)
+    // A write after claude has exited fails with EPIPE; without a listener that
+    // error would crash the whole server. The exit code below reports the failure.
+    child.stdin.on('error', () => {})
+    const send = (message: unknown) => {
+      if (!child.stdin.writableEnded) child.stdin.write(`${JSON.stringify(message)}\n`)
+    }
+    send({ type: 'user', message: { role: 'user', content: data.text } })
     let stderr = ''
     child.stderr.on('data', (chunk) => (stderr += chunk))
     const exit = new Promise<number | Error | null>((resolve) => {
@@ -164,13 +206,89 @@ export const sendMessage = createServerFn({ method: 'POST' })
         .then((code) => (code === 0 ? addToDesktop(cwd, data.session) : undefined))
         .catch((e) => console.error(`Adding session ${data.session} to Claude Desktop failed:`, e))
     }
+    // The process is read here, not in the loop below, so approvals are still
+    // answered and stdin still closes when the page goes away mid-turn.
+    const queue: Array<Entry | PermissionRequest> = []
+    let wake: (() => void) | null = null
+    let ended = false
+    let listening = true
+    const open = new Set<string>()
+    const push = (item: Entry | PermissionRequest) => {
+      queue.push(item)
+      wake?.()
+    }
+    const answer = (requestId: string, input: unknown, allow: boolean) => {
+      open.delete(requestId)
+      pending.delete(requestId)
+      send({
+        type: 'control_response',
+        response: {
+          subtype: 'success',
+          request_id: requestId,
+          response: allow
+            ? { behavior: 'allow', updatedInput: input }
+            : { behavior: 'deny', message: 'Denied in the session viewer.' },
+        },
+      })
+    }
+    const lines = createInterface({ input: child.stdout })
+    lines.on('line', (line) => {
+      let message: ControlLine
+      try {
+        message = JSON.parse(line)
+      } catch {
+        return
+      }
+      if (message.type === 'control_request' && message.request_id) {
+        const request = message.request ?? {}
+        if (request.subtype !== 'can_use_tool') {
+          send({
+            type: 'control_response',
+            response: { subtype: 'error', request_id: message.request_id, error: 'Not supported' },
+          })
+        } else if (!listening) {
+          answer(message.request_id, request.input, false)
+        } else {
+          const requestId = message.request_id
+          open.add(requestId)
+          pending.set(requestId, (allow) => answer(requestId, request.input, allow))
+          push({
+            kind: 'permission',
+            requestId,
+            tool: request.display_name ?? request.tool_name ?? 'tool',
+            description: request.description ?? '',
+            input: JSON.stringify(request.input, null, 2),
+          })
+        }
+        return
+      }
+      // With stream-json input, the CLI waits for more messages until stdin closes.
+      if (message.type === 'result') child.stdin.end()
+      for (const entry of parseSession(line)) push(entry)
+    })
+    lines.on('close', () => {
+      ended = true
+      wake?.()
+    })
+    // Nobody can answer once the page is gone: deny what is open and what comes
+    // later. The abort signal fires even while the loop below waits for an item.
+    const signal = getRequest().signal
+    const gone = () => {
+      listening = false
+      for (const requestId of open) pending.get(requestId)?.(false)
+      wake?.()
+    }
+    signal.addEventListener('abort', gone, { once: true })
     try {
-      for await (const line of createInterface({ input: child.stdout })) {
-        yield* parseSession(line)
+      while (true) {
+        while (queue.length > 0) yield queue.shift()!
+        if (ended || signal.aborted) break
+        await new Promise<void>((resolve) => (wake = resolve))
+        wake = null
       }
     } finally {
-      // If the page goes away, let Claude finish the turn instead of blocking on a full pipe.
-      child.stdout.resume()
+      signal.removeEventListener('abort', gone)
+      gone()
     }
     const code = await exit
     if (code !== 0) {

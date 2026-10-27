@@ -63,6 +63,8 @@ const css = `
   form { display: grid; gap: 8px; position: sticky; bottom: 0; padding: 12px 0 16px; background: Canvas; }
   textarea { font: inherit; padding: 8px; }
   form button { justify-self: start; padding: 6px 16px; }
+  .approval { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid #f59e0b; border-radius: 8px; }
+  .approval .actions { display: flex; gap: 8px; }
   @media (max-width: 700px) {
     .layout { grid-template-columns: minmax(0, 1fr); }
     .sidebar { position: fixed; inset: 0 auto 0 0; width: min(85vw, 320px); height: 100dvh; }

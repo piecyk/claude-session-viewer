@@ -2,8 +2,8 @@ import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-route
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { formatTime } from '../parse.ts'
-import type { Block, Entry } from '../parse.ts'
-import { getSession, sendMessage } from '../sessions.ts'
+import type { Block, Entry, PermissionRequest } from '../parse.ts'
+import { answerPermission, getSession, sendMessage } from '../sessions.ts'
 
 export const Route = createFileRoute('/$project/$session')({
   loader: ({ params }) => getSession({ data: params }),
@@ -23,6 +23,7 @@ function TranscriptView({ project, session }: { project: string; session: string
   const title = group?.sessions.find((s) => s.id === session)?.title
   const router = useRouter()
   const [live, setLive] = useState<Array<Entry>>([])
+  const [asks, setAsks] = useState<Array<PermissionRequest>>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const all = [...entries, ...live]
@@ -60,15 +61,26 @@ function TranscriptView({ project, session }: { project: string; session: string
       },
     ])
     try {
-      for await (const entry of await sendMessage({ data: { project, session, text } })) {
-        setLive((l) => [...l, entry])
+      for await (const item of await sendMessage({ data: { project, session, text } })) {
+        if ('kind' in item) setAsks((a) => [...a, item])
+        else setLive((l) => [...l, item])
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       await router.invalidate()
       setLive([])
+      setAsks([])
       setPending(false)
+    }
+  }
+
+  async function decide(ask: PermissionRequest, allow: boolean) {
+    setAsks((a) => a.filter((x) => x.requestId !== ask.requestId))
+    try {
+      await answerPermission({ data: { requestId: ask.requestId, allow } })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
     }
   }
 
@@ -105,8 +117,35 @@ function TranscriptView({ project, session }: { project: string; session: string
           )
         })}
       </div>
-      <SendForm pending={pending} error={error} onSend={send} />
+      <SendForm pending={pending} error={error} onSend={send}>
+        {asks.map((ask) => (
+          <Approval key={ask.requestId} ask={ask} onDecide={(allow) => decide(ask, allow)} />
+        ))}
+      </SendForm>
     </>
+  )
+}
+
+function Approval({ ask, onDecide }: { ask: PermissionRequest; onDecide: (allow: boolean) => void }) {
+  return (
+    <div className="approval" role="alert">
+      <strong>
+        Allow {ask.tool}
+        {ask.description && `: ${ask.description}`}?
+      </strong>
+      <details>
+        <summary>details</summary>
+        <pre>{ask.input}</pre>
+      </details>
+      <div className="actions">
+        <button type="button" onClick={() => onDecide(true)}>
+          Allow
+        </button>
+        <button type="button" onClick={() => onDecide(false)}>
+          Deny
+        </button>
+      </div>
+    </div>
   )
 }
 
@@ -114,10 +153,12 @@ function SendForm({
   pending,
   error,
   onSend,
+  children,
 }: {
   pending: boolean
   error: string
   onSend: (text: string) => Promise<void>
+  children?: React.ReactNode
 }) {
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -130,6 +171,7 @@ function SendForm({
 
   return (
     <form onSubmit={onSubmit}>
+      {children}
       <label htmlFor="text">Message</label>
       <textarea id="text" name="text" rows={3} disabled={pending} />
       <button type="submit" disabled={pending}>

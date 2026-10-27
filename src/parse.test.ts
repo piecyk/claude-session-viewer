@@ -61,7 +61,7 @@ test('customTitle returns the last custom-title, else empty', () => {
   assert.equal(customTitle(jsonl), '')
 })
 
-test('sessionSettings keeps first cwd, last headless mode, and last added folders', () => {
+test('sessionSettings keeps first cwd, last CLI mode, and last added folders', () => {
   const lines = [
     '{broken',
     jsonl,
@@ -75,7 +75,7 @@ test('sessionSettings keeps first cwd, last headless mode, and last added folder
   ].join('\n')
   assert.deepEqual(sessionSettings(lines), {
     cwd: '/w',
-    permissionMode: 'auto',
+    permissionMode: 'manual',
     addDirs: ['/a', '/b'],
   })
 })

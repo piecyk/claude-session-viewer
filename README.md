@@ -84,12 +84,15 @@ done.
 
 - **Read.** Each session is a `.jsonl` file in `~/.claude/projects/<project>/`.
   The server reads these files and keeps the `user` and `assistant` records.
-- **Send.** The server runs `claude --resume <id> --print --output-format stream-json`
-  in the session's folder, and streams each output line to the page.
+- **Send.** The server runs `claude --resume <id> --print` with stream-json input
+  and output in the session's folder, and streams each output line to the page.
 - **Permissions.** The server reads the session's last permission mode and its
-  added folders from the session file, and passes them to `claude`. It never
-  uses `bypassPermissions`. It skips `default`, because a headless run cannot
-  ask you for approval.
+  added folders from the session file, and passes them to `claude` (`default`
+  becomes the CLI's `manual`). It never uses `bypassPermissions`.
+- **Approvals.** With `--permission-prompt-tool stdio`, a tool call that needs
+  approval arrives as a `control_request`. The page shows it with **Allow** and
+  **Deny**, and the server writes the answer back to `claude`. If the page goes
+  away, open and later requests are denied, so the turn still ends.
 - **Titles.** The sidebar shows the title Claude Desktop gave the session (a
   `custom-title` record near the end of the file), or else the first prompt.
 - **New session.** The **+** next to a project opens an empty page with a new UUID. The first
