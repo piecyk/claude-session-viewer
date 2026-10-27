@@ -1,7 +1,7 @@
 import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { formatTime } from '../parse.ts'
+import { formatTime, openNextStep } from '../parse.ts'
 import type { Block, Entry, PermissionRequest } from '../parse.ts'
 import { answerPermission, getSession, sendMessage } from '../sessions.ts'
 
@@ -27,6 +27,7 @@ function TranscriptView({ project, session }: { project: string; session: string
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const all = [...entries, ...live]
+  const nextStep = pending ? undefined : openNextStep(all)
 
   const listRef = useRef<HTMLDivElement>(null)
   const [listTop, setListTop] = useState(0)
@@ -118,6 +119,18 @@ function TranscriptView({ project, session }: { project: string; session: string
         })}
       </div>
       <SendForm pending={pending} error={error} onSend={send}>
+        {nextStep && (
+          <div className="next-step-ask">
+            <strong>{nextStep.ask}</strong>
+            <div className="actions">
+              {nextStep.actions.map((action) => (
+                <button key={action.label} type="button" title={action.message} onClick={() => send(action.message)}>
+                  {action.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {asks.map((ask) => (
           <Approval key={ask.requestId} ask={ask} onDecide={(allow) => decide(ask, allow)} />
         ))}
@@ -200,6 +213,8 @@ function BlockView({ block }: { block: Block }) {
           <pre>{block.input}</pre>
         </details>
       )
+    case 'next_step':
+      return <pre className="next-step">{block.recap}</pre>
     case 'tool_result':
       return (
         <details>

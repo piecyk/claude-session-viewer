@@ -3,6 +3,10 @@ export type Block =
   | { type: 'thinking'; text: string }
   | { type: 'tool_use'; name: string; input: string }
   | { type: 'tool_result'; text: string; isError: boolean }
+  | { type: 'next_step'; recap: string; ask: string; actions: Array<NextStepAction> }
+
+// A button from Claude Desktop's next-step box. Clicking it sends `message`.
+export type NextStepAction = { label: string; message: string }
 
 // A tool call waiting for Allow or Deny in the viewer.
 export type PermissionRequest = {
@@ -53,6 +57,7 @@ function toBlock(b: RawBlock): Block {
     case 'thinking':
       return { type: 'thinking', text: b.thinking ?? '' }
     case 'tool_use':
+      if (b.name === 'mcp__ccd_turn__wrap_up') return nextStep(b.input)
       return {
         type: 'tool_use',
         name: b.name ?? '?',
@@ -139,6 +144,36 @@ export function sessionSettings(jsonl: string): SessionSettings {
     if (Array.isArray(dirs)) settings.addDirs = dirs.filter((d) => typeof d === 'string')
   }
   return settings
+}
+
+// Claude Desktop draws its next-step box from this tool call's input:
+// { recap, ask?, actions?: [{ label, message? } | { action }] }.
+function nextStep(input: unknown): Block {
+  const i = (input ?? {}) as { recap?: unknown; ask?: unknown; actions?: unknown }
+  const actions: Array<NextStepAction> = []
+  for (const a of Array.isArray(i.actions) ? i.actions : []) {
+    const { label, message } = (a ?? {}) as { label?: unknown; message?: unknown }
+    // App actions ({ action: 'commit' }, …) have no text to send; the viewer skips them.
+    if (typeof label !== 'string') continue
+    actions.push({ label, message: typeof message === 'string' ? message : label })
+  }
+  return {
+    type: 'next_step',
+    recap: typeof i.recap === 'string' ? i.recap : '',
+    ask: typeof i.ask === 'string' ? i.ask : '',
+    actions,
+  }
+}
+
+// The open question of the latest turn: a next step after the last prompt you typed.
+export function openNextStep(entries: Array<Entry>) {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    const blocks = entries[i].blocks
+    if (entries[i].role === 'user' && blocks.some((b) => b.type === 'text')) return undefined
+    const step = blocks.find((b) => b.type === 'next_step')
+    if (step?.type === 'next_step') return step.ask && step.actions.length > 0 ? step : undefined
+  }
+  return undefined
 }
 
 // The desktop app writes its session titles as `custom-title` records, again

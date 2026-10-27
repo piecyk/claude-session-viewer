@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { customTitle, firstPrompt, lastActivity, parseSession, sessionSettings } from './parse.ts'
+import { customTitle, firstPrompt, lastActivity, openNextStep, parseSession, sessionSettings } from './parse.ts'
 
 const jsonl = [
   JSON.stringify({ type: 'queue-operation' }),
@@ -100,4 +100,43 @@ test('lastActivity returns the last user or assistant timestamp', () => {
   ].join('\n')
   assert.equal(lastActivity(lines), '2026-10-01T10:05:00Z')
   assert.equal(lastActivity(''), '')
+})
+
+test('wrap_up becomes a next step, and only the latest unanswered one is open', () => {
+  const wrapUp = JSON.stringify({
+    type: 'assistant',
+    uuid: 'w1',
+    message: {
+      content: [
+        {
+          type: 'tool_use',
+          name: 'mcp__ccd_turn__wrap_up',
+          input: {
+            recap: 'Done.',
+            ask: 'Push it?',
+            actions: [{ label: 'Yes, push', message: 'Yes, push main.' }, { label: 'Not now' }, { action: 'commit' }],
+          },
+        },
+      ],
+    },
+  })
+  const step = parseSession(wrapUp)[0].blocks[0]
+  assert.deepEqual(step, {
+    type: 'next_step',
+    recap: 'Done.',
+    ask: 'Push it?',
+    actions: [
+      { label: 'Yes, push', message: 'Yes, push main.' },
+      { label: 'Not now', message: 'Not now' },
+    ],
+  })
+  const toolResult = JSON.stringify({
+    type: 'user',
+    uuid: 'r1',
+    message: { content: [{ type: 'tool_result', content: 'ok' }] },
+  })
+  const reply = JSON.stringify({ type: 'assistant', uuid: 'a2', message: { content: [{ type: 'text', text: 'Bye' }] } })
+  assert.deepEqual(openNextStep(parseSession([wrapUp, toolResult, reply].join('\n'))), step)
+  const answered = JSON.stringify({ type: 'user', uuid: 'u9', message: { content: 'Yes, push main.' } })
+  assert.equal(openNextStep(parseSession([wrapUp, reply, answered].join('\n'))), undefined)
 })
