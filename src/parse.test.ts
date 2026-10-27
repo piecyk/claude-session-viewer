@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { customTitle, firstPrompt, lastActivity, openNextStep, parseSession, sessionSettings } from './parse.ts'
+import { customTitle, firstPrompt, lastActivity, lastPromptIndex, openNextStep, parseSession, sessionSettings } from './parse.ts'
 
 const jsonl = [
   JSON.stringify({ type: 'queue-operation' }),
@@ -139,4 +139,27 @@ test('wrap_up becomes a next step, and only the latest unanswered one is open', 
   assert.deepEqual(openNextStep(parseSession([wrapUp, toolResult, reply].join('\n'))), step)
   const answered = JSON.stringify({ type: 'user', uuid: 'u9', message: { content: 'Yes, push main.' } })
   assert.equal(openNextStep(parseSession([wrapUp, reply, answered].join('\n'))), undefined)
+})
+
+test('spawn_task becomes a task card; lastPromptIndex skips tool results', () => {
+  const lines = [
+    JSON.stringify({ type: 'user', uuid: 'u1', message: { content: 'review PRs' } }),
+    JSON.stringify({
+      type: 'assistant',
+      uuid: 'a1',
+      message: {
+        content: [
+          {
+            type: 'tool_use',
+            name: 'mcp__ccd_session__spawn_task',
+            input: { title: 'Review PR #1', tldr: 'Short', prompt: 'Do the review.' },
+          },
+        ],
+      },
+    }),
+    JSON.stringify({ type: 'user', uuid: 'r1', message: { content: [{ type: 'tool_result', content: 'ok' }] } }),
+  ].join('\n')
+  const entries = parseSession(lines)
+  assert.deepEqual(entries[1].blocks[0], { type: 'task', title: 'Review PR #1', tldr: 'Short', prompt: 'Do the review.' })
+  assert.equal(lastPromptIndex(entries), 0)
 })

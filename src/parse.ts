@@ -4,6 +4,7 @@ export type Block =
   | { type: 'tool_use'; name: string; input: string }
   | { type: 'tool_result'; text: string; isError: boolean }
   | { type: 'next_step'; recap: string; ask: string; actions: Array<NextStepAction> }
+  | { type: 'task'; title: string; tldr: string; prompt: string }
 
 // A button from Claude Desktop's next-step box. Clicking it sends `message`.
 export type NextStepAction = { label: string; message: string }
@@ -58,6 +59,10 @@ function toBlock(b: RawBlock): Block {
       return { type: 'thinking', text: b.thinking ?? '' }
     case 'tool_use':
       if (b.name === 'mcp__ccd_turn__wrap_up') return nextStep(b.input)
+      if (b.name === 'mcp__ccd_session__spawn_task' || b.name === 'mcp__ccd_session__start_session') {
+        const task = taskCard(b.input)
+        if (task) return task
+      }
       return {
         type: 'tool_use',
         name: b.name ?? '?',
@@ -163,6 +168,23 @@ function nextStep(input: unknown): Block {
     ask: typeof i.ask === 'string' ? i.ask : '',
     actions,
   }
+}
+
+// Claude Desktop shows these calls as "suggested task" cards: { title, tldr?, prompt }.
+// Whether a card was started or dismissed lives in the app, not in the file.
+function taskCard(input: unknown): Block | undefined {
+  const i = (input ?? {}) as { title?: unknown; tldr?: unknown; prompt?: unknown }
+  if (typeof i.title !== 'string' || typeof i.prompt !== 'string') return undefined
+  return { type: 'task', title: i.title, tldr: typeof i.tldr === 'string' ? i.tldr : '', prompt: i.prompt }
+}
+
+// Index of the last prompt you typed (a user entry with text), or -1. Cards and
+// questions after it belong to the latest turn.
+export function lastPromptIndex(entries: Array<Entry>): number {
+  for (let i = entries.length - 1; i >= 0; i--) {
+    if (entries[i].role === 'user' && entries[i].blocks.some((b) => b.type === 'text')) return i
+  }
+  return -1
 }
 
 // The open question of the latest turn: a next step after the last prompt you typed.

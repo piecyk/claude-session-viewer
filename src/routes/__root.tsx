@@ -68,6 +68,9 @@ const css = `
   .next-step { padding: 6px 10px; border-radius: 6px; background: var(--hover); }
   .next-step-ask { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
   .next-step-ask .actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .task { display: grid; gap: 4px; margin: 6px 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; }
+  .task p { margin: 0; }
+  .task .actions { display: flex; gap: 8px; }
   @media (max-width: 700px) {
     .layout { grid-template-columns: minmax(0, 1fr); }
     .sidebar { position: fixed; inset: 0 auto 0 0; width: min(85vw, 320px); height: 100dvh; }

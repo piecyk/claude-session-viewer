@@ -1,9 +1,18 @@
-import { createFileRoute, useLoaderData, useRouter } from '@tanstack/react-router'
+import { createFileRoute, useLoaderData, useLocation, useNavigate, useRouter } from '@tanstack/react-router'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
-import { formatTime, openNextStep } from '../parse.ts'
+import { formatTime, lastPromptIndex, openNextStep } from '../parse.ts'
 import type { Block, Entry, PermissionRequest } from '../parse.ts'
 import { answerPermission, getSession, sendMessage } from '../sessions.ts'
+
+// "Start" on a task card opens a new session page with the brief in history state.
+declare module '@tanstack/react-router' {
+  interface HistoryState {
+    prompt?: string
+  }
+}
+
+type TaskActions = { start: (prompt: string) => void; here: (title: string) => void }
 
 export const Route = createFileRoute('/$project/$session')({
   loader: ({ params }) => getSession({ data: params }),
@@ -22,12 +31,25 @@ function TranscriptView({ project, session }: { project: string; session: string
   const group = sidebar.find((p) => p.name === project)
   const title = group?.sessions.find((s) => s.id === session)?.title
   const router = useRouter()
+  const navigate = useNavigate()
+  const startPrompt = useLocation({ select: (l) => l.state.prompt })
   const [live, setLive] = useState<Array<Entry>>([])
   const [asks, setAsks] = useState<Array<PermissionRequest>>([])
   const [pending, setPending] = useState(false)
   const [error, setError] = useState('')
   const all = [...entries, ...live]
   const nextStep = pending ? undefined : openNextStep(all)
+  const openFrom = lastPromptIndex(all)
+  const taskActions: TaskActions = {
+    start: (prompt) =>
+      navigate({
+        to: '/$project/$session',
+        params: { project, session: crypto.randomUUID() },
+        state: { prompt },
+        resetScroll: false,
+      }),
+    here: (title) => send(`Do this task here, in this session, not in a new one: "${title}"`),
+  }
 
   const listRef = useRef<HTMLDivElement>(null)
   const [listTop, setListTop] = useState(0)
@@ -76,6 +98,15 @@ function TranscriptView({ project, session }: { project: string; session: string
     }
   }
 
+  // A new session opened from a task card sends the brief once, on its first render.
+  const started = useRef(false)
+  useEffect(() => {
+    if (startPrompt && entries.length === 0 && !started.current) {
+      started.current = true
+      void send(startPrompt)
+    }
+  }, [])
+
   async function decide(ask: PermissionRequest, allow: boolean) {
     setAsks((a) => a.filter((x) => x.requestId !== ask.requestId))
     try {
@@ -111,7 +142,11 @@ function TranscriptView({ project, session }: { project: string; session: string
                   {e.role} · {formatTime(e.timestamp)}
                 </div>
                 {e.blocks.map((b, i) => (
-                  <BlockView key={i} block={b} />
+                  <BlockView
+                    key={i}
+                    block={b}
+                    task={!pending && item.index > openFrom ? taskActions : undefined}
+                  />
                 ))}
               </div>
             </div>
@@ -195,8 +230,29 @@ function SendForm({
   )
 }
 
-function BlockView({ block }: { block: Block }) {
+function BlockView({ block, task }: { block: Block; task?: TaskActions }) {
   switch (block.type) {
+    case 'task':
+      return (
+        <div className="task">
+          <strong>{block.title}</strong>
+          {block.tldr && <p className="meta">{block.tldr}</p>}
+          <details>
+            <summary>prompt</summary>
+            <pre>{block.prompt}</pre>
+          </details>
+          {task && (
+            <div className="actions">
+              <button type="button" onClick={() => task.start(block.prompt)}>
+                Start
+              </button>
+              <button type="button" onClick={() => task.here(block.title)}>
+                Do it here
+              </button>
+            </div>
+          )}
+        </div>
+      )
     case 'text':
       return <pre>{block.text}</pre>
     case 'thinking':
