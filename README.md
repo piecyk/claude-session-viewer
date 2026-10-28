@@ -30,9 +30,8 @@ Open http://127.0.0.1:3333.
 
 ### Remote access (phone) with a password
 
-Use HTTP Basic auth and a
-[Cloudflare Quick Tunnel](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/do-more-with-tunnels/trycloudflare/).
-The tunnel gives you a public HTTPS URL; the password is what keeps others out.
+Use HTTP Basic auth and an [ngrok](https://ngrok.com) tunnel. The tunnel gives
+you a public HTTPS URL; the password is what keeps others out.
 
 1. Set the credentials in a `.env` file next to `package.json`. The file is
    git-ignored.
@@ -54,31 +53,30 @@ The tunnel gives you a public HTTPS URL; the password is what keeps others out.
    pnpm dev
    ```
 
-3. Install `cloudflared` and start the tunnel in a second terminal.
+3. Install `ngrok` and add your auth token (from the ngrok dashboard) once.
 
    ```bash
-   brew install cloudflared
-   cloudflared tunnel --url http://127.0.0.1:3333 --http-host-header 127.0.0.1:3333
+   brew install ngrok
+   ngrok config add-authtoken <your-token>
    ```
 
-   `--http-host-header` is required: the server accepts only `127.0.0.1` and
-   `localhost` as the host.
-
-4. Open the URL that `cloudflared` prints (`https://<random-words>.trycloudflare.com`)
-   and sign in. The URL changes every time you restart `cloudflared`; an old
-   URL shows Cloudflare error 1033. To read the current URL while the tunnel
-   runs:
+4. Start the tunnel in a second terminal. Use your static domain from the
+   ngrok dashboard (**Domains**), so the URL stays the same after a restart.
 
    ```bash
-   curl -s http://127.0.0.1:20241/quicktunnel
+   ngrok http 127.0.0.1:3333 --url https://<your-domain>.ngrok-free.dev --host-header=rewrite
    ```
 
-   `20241` is the default metrics port. If it is busy, `cloudflared` uses the
-   next free port.
+   - `--host-header=rewrite` is required: Vite and the server accept only
+     `127.0.0.1` and `localhost` as the host. Without it, Vite shows
+     "Blocked request. This host is not allowed."
+   - Use `127.0.0.1:3333`, not `3333`: `localhost` can resolve to `::1`, and the
+     server listens on IPv4 only.
 
-Do not use `cloudflared`'s `--allowed-mail` option: the page loads, but its
-later requests fail ("Load failed"). Stop the tunnel (`Ctrl+C`) when you are
-done.
+5. Open the URL and sign in. On the free plan, ngrok shows a warning page on
+   the first visit; click **Visit Site**.
+
+Stop the tunnel (`Ctrl+C`) when you are done.
 
 ## How it works
 
@@ -113,7 +111,7 @@ This app runs Claude on your machine with your session permissions, for example
   your whole network, and reading needs no password unless `VIEWER_PASSWORD` is set.
 - The server accepts send requests only from its own pages on `127.0.0.1` or
   `localhost`. This blocks other websites and DNS rebinding.
-- Behind a tunnel, the host check passes. Always set `VIEWER_PASSWORD` before you
+- Behind a tunnel with a rewritten host header, the host check passes. Always set `VIEWER_PASSWORD` before you
   start a tunnel, and use a long random password.
 
 ## Limits
