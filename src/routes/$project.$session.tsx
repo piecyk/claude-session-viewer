@@ -1,6 +1,9 @@
-import { createFileRoute, useLoaderData, useLocation, useNavigate, useRouter } from '@tanstack/react-router'
+import { Link, createFileRoute, useLoaderData, useLocation, useNavigate, useRouter } from '@tanstack/react-router'
 import { useWindowVirtualizer } from '@tanstack/react-virtual'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import Markdown from 'react-markdown'
+import type { Components } from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import { formatTime, lastPromptIndex, openNextStep } from '../parse.ts'
 import type { Block, Entry, PermissionRequest } from '../parse.ts'
 import { answerPermission, getSession, sendMessage } from '../sessions.ts'
@@ -145,6 +148,7 @@ function TranscriptView({ project, session }: { project: string; session: string
                   <BlockView
                     key={i}
                     block={b}
+                    role={e.role}
                     task={!pending && item.index > openFrom ? taskActions : undefined}
                   />
                 ))}
@@ -230,7 +234,29 @@ function SendForm({
   )
 }
 
-function BlockView({ block, task }: { block: Block; task?: TaskActions }) {
+// Links in Claude Desktop transcripts: `#local_<id>` is a session, http(s) is a
+// web page, anything else is a file path the app opens in its file pane.
+const markdownComponents: Components = {
+  a: ({ href = '', children }) => {
+    if (href.startsWith('#local_')) {
+      return (
+        <Link to="/desktop/$id" params={{ id: href.slice(1) }} resetScroll={false}>
+          {children}
+        </Link>
+      )
+    }
+    if (/^https?:/.test(href)) {
+      return (
+        <a href={href} target="_blank" rel="noreferrer">
+          {children}
+        </a>
+      )
+    }
+    return <code title={href}>{children}</code>
+  },
+}
+
+function BlockView({ block, role, task }: { block: Block; role: Entry['role']; task?: TaskActions }) {
   switch (block.type) {
     case 'task':
       return (
@@ -254,7 +280,15 @@ function BlockView({ block, task }: { block: Block; task?: TaskActions }) {
         </div>
       )
     case 'text':
-      return <pre>{block.text}</pre>
+      // Your prompts stay as typed; Claude's replies are Markdown.
+      if (role === 'user') return <pre>{block.text}</pre>
+      return (
+        <div className="markdown">
+          <Markdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+            {block.text}
+          </Markdown>
+        </div>
+      )
     case 'thinking':
       return (
         <details>

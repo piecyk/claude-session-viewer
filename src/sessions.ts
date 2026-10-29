@@ -128,6 +128,29 @@ async function readSessionFile(project: string, session: string) {
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
+// Claude Desktop keeps one file per session, at <account>/<org>/local_<id>.json.
+const DESKTOP = join(homedir(), 'Library', 'Application Support', 'Claude', 'claude-code-sessions')
+
+// A `#local_<id>` link in a Claude Desktop transcript names the app's session id.
+// The app's file for it holds the CLI session id, which names the .jsonl file.
+export const findDesktopSession = createServerFn({ method: 'GET' })
+  .validator((id: string) => {
+    if (typeof id !== 'string' || !/^local_[0-9a-f-]{36}$/.test(id)) throw new Error('Invalid session id')
+    return id
+  })
+  .handler(async ({ data: id }) => {
+    const files = await readdir(DESKTOP, { recursive: true }).catch(() => [])
+    const file = files.find((f) => basename(f) === `${id}.json`)
+    if (!file) return undefined
+    const { cliSessionId } = JSON.parse(await readFile(join(DESKTOP, file), 'utf8')) as { cliSessionId?: unknown }
+    if (typeof cliSessionId !== 'string' || !UUID.test(cliSessionId)) return undefined
+    for (const project of await readdir(ROOT)) {
+      const found = await stat(join(ROOT, project, `${cliSessionId}.jsonl`)).catch(() => undefined)
+      if (found) return { project, session: cliSessionId }
+    }
+    return undefined
+  })
+
 // This endpoint runs Claude on this machine. Only accept requests from this
 // app's own pages on a loopback host (blocks other sites and DNS rebinding).
 function assertLocalSameOrigin() {

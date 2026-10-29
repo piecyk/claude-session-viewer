@@ -68,6 +68,17 @@ const css = `
   details { margin: 4px 0; }
   summary { cursor: pointer; font-size: 13px; opacity: .8; }
   .error { color: #ef4444; }
+  .markdown { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+  .markdown > :first-child { margin-top: 4px; }
+  .markdown > :last-child { margin-bottom: 4px; }
+  .markdown p, .markdown ul, .markdown ol { margin: 8px 0; }
+  .markdown ul, .markdown ol { padding-left: 24px; }
+  .markdown a { color: #60a5fa; }
+  .markdown code { font-size: 13px; padding: 1px 4px; border-radius: 4px; background: var(--hover); }
+  .markdown pre { padding: 8px 10px; border-radius: 6px; background: var(--hover); overflow-x: auto; }
+  .markdown pre code { padding: 0; background: none; }
+  .markdown table { border-collapse: collapse; display: block; overflow-x: auto; }
+  .markdown th, .markdown td { border: 1px solid var(--border); padding: 4px 8px; text-align: left; }
   form { display: grid; gap: 8px; position: sticky; bottom: 0; padding: 12px 0 16px; background: Canvas; }
   textarea { font: inherit; padding: 8px; }
   form button { justify-self: start; padding: 6px 16px; }

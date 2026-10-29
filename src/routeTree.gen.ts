@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ProjectSessionRouteImport } from './routes/$project.$session'
+import { Route as DesktopIdRouteImport } from './routes/desktop.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -22,31 +23,40 @@ const ProjectSessionRoute = ProjectSessionRouteImport.update({
   path: '/$project/$session',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DesktopIdRoute = DesktopIdRouteImport.update({
+  id: '/desktop/$id',
+  path: '/desktop/$id',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$project/$session': typeof ProjectSessionRoute
+  '/desktop/$id': typeof DesktopIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$project/$session': typeof ProjectSessionRoute
+  '/desktop/$id': typeof DesktopIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/$project/$session': typeof ProjectSessionRoute
+  '/desktop/$id': typeof DesktopIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/$project/$session'
+  fullPaths: '/' | '/$project/$session' | '/desktop/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/$project/$session'
-  id: '__root__' | '/' | '/$project/$session'
+  to: '/' | '/$project/$session' | '/desktop/$id'
+  id: '__root__' | '/' | '/$project/$session' | '/desktop/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ProjectSessionRoute: typeof ProjectSessionRoute
+  DesktopIdRoute: typeof DesktopIdRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -65,12 +75,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ProjectSessionRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/desktop/$id': {
+      id: '/desktop/$id'
+      path: '/desktop/$id'
+      fullPath: '/desktop/$id'
+      preLoaderRoute: typeof DesktopIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ProjectSessionRoute: ProjectSessionRoute,
+  DesktopIdRoute: DesktopIdRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
