@@ -12,8 +12,8 @@ dependencies:
     specifier: ^1.168.60
     version: 1.169.4(react-dom@19.3.1)(react@19.3.1)(vite@8.3.5)
   '@tanstack/react-virtual':
-    specifier: ^3.14.23
-    version: 3.14.23(react-dom@19.3.1)(react@19.3.1)
+    specifier: ^3.14.24
+    version: 3.14.24(react-dom@19.3.1)(react@19.3.1)
   react:
     specifier: ^19.2.3
     version: 19.3.1
@@ -531,13 +531,13 @@ packages:
       use-sync-external-store: 1.7.0(react@19.3.1)
     dev: false
 
-  /@tanstack/react-virtual@3.14.23(react-dom@19.3.1)(react@19.3.1):
-    resolution: {integrity: sha512-Oyy58qQwdaQieA+A4WUDtnh9D1rv5FZvGdw8og9Xeyh88V6HH94vMSyV5i9ATIbYNe9t5Ix0WXRo9NOTpHDkYw==}
+  /@tanstack/react-virtual@3.14.24(react-dom@19.3.1)(react@19.3.1):
+    resolution: {integrity: sha512-JoNsByXR68fNlB2NZuT3bSk8uYBxuOWl6YNJ7djTrw7IMwBWuaOtffxj/TcuMa80WmL6byb+80i1NEM/8Qmocw==}
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
     dependencies:
-      '@tanstack/virtual-core': 3.19.8
+      '@tanstack/virtual-core': 3.19.9
       react: 19.3.1
       react-dom: 19.3.1(react@19.3.1)
     dev: false
@@ -714,8 +714,8 @@ packages:
     resolution: {integrity: sha512-sJ4mjol8uQsHV0gOJzzjwXfh2Fwm+Sz0+8deqiTm4jGbMdjzNSW+xZCFm0kUa870uhd8yi+DpKnZb5Kc4apa0Q==}
     dev: false
 
-  /@tanstack/virtual-core@3.19.8:
-    resolution: {integrity: sha512-Oz/SYBo/aVPyQkwtOw7Q23myITUgFIof2glQqydYJAPL6mH2SkJDkvDKZTklB+7gv5jGLZQhyTcd7SO1A1EODQ==}
+  /@tanstack/virtual-core@3.19.9:
+    resolution: {integrity: sha512-Syiaf3w69dFyYv4o2mqJ1/2VtBJTNq5Hu5cVXfnzOuJKFpUojukQR13ZW+5NvdMJM7GFHeNPmveMNhoIubiFyA==}
     dev: false
 
   /@tanstack/virtual-file-routes@1.162.0:
